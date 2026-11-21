@@ -2,7 +2,7 @@
 //! the player-head item for a teammate's face, the HUD's heart, food and armour sprites, the
 //! experience level's green number, and block icons for dimensions. Right-to-left languages
 //! mirror the cards (`rtl.rs`).
-use crate::payloads::{Member, PingKind};
+use crate::payloads::PingKind;
 use crate::ping::{distance, view_vector, MARKERS};
 use crate::roster::{Mate, FLASH, MATES};
 use crate::settings::{self as s, Side};
@@ -14,20 +14,27 @@ use mod_api::prelude::*;
 
 /// Inset of the edge arrows from the screen border, in GUI pixels.
 const EDGE: f32 = 14.0;
+/// Space between the screen edge and a panel's visible edge, and between two panels.
 const MARGIN: f32 = 4.0;
-const GAP: f32 = 3.0;
-/// The panel's own border (popup/background's nine-slice border), so nothing touches it.
-const PAD: f32 = 6.0;
 /// A HUD icon (heart, food, armour) as the vanilla HUD spaces them.
 const ICON: f32 = 8.0;
 const HEAD: f32 = 16.0;
-/// The card: padding, head, gap, ten icons, padding.
-const CARD_W: f32 = PAD + HEAD + 4.0 + 10.0 * ICON + 1.0 + PAD;
-/// The card is the game's own popup panel (`popup/background`, nine-slice), as its settings
-/// windows draw it; a hurt teammate's panel is tinted red for the flash.
-const PANEL: &str = "popup/background";
+/// A text line's height with its shadow.
+const LINE: f32 = 9.0;
+/// The gap between the head column and the info column, and between the name and the rows.
+const SPACE: f32 = 4.0;
+/// Ten icons, as wide as the HUD's heart row.
+const ROW_W: f32 = 10.0 * ICON + 1.0;
+/// The card is the game's tooltip panel (`tooltip/background` and `tooltip/frame`), drawn as
+/// vanilla's `TooltipRenderUtil` does: the sprites span the content plus `BLEED` on every side,
+/// and their visible part starts `VISIBLE` outside the content, the same on all four sides.
+const BACKGROUND: &str = "tooltip/background";
+const FRAME: &str = "tooltip/frame";
+const BLEED: f32 = 12.0;
+const VISIBLE: f32 = 4.0;
 const PANEL_TINT: u32 = 0xFFFF_FFFF;
-const HURT_TINT: u32 = 0xFFFF_7070;
+/// A hurt teammate's panel, for the flash.
+const HURT_TINT: u32 = 0xFFFF_6060;
 const DANGER: u32 = 0xFFFF_5555;
 const TEXT: u32 = 0xFFFF_FFFF;
 const DIM: u32 = 0xFFAA_AAAA;
@@ -255,76 +262,176 @@ fn markers(host: &dyn ClientHost, draw: &mut dyn DrawContext, camera: &mod_api::
     }
 }
 
-/// How tall a member's card is: the name row, an armour row when they wear any, hearts, food.
-fn card_height(m: &Member) -> f32 {
-    let rows = if m.armor > 0 { 3.0 } else { 2.0 };
-    // The last row's icons hang a pixel low, as the HUD's do: two more keep them off the border.
-    PAD + 9.0 + 2.0 + rows * (ICON + 1.0) + PAD + 2.0
+/// A card's parts, `[x, y, w, h]` in content pixels, left to right with the origin at the
+/// content's top left (a right-to-left language mirrors the x's when drawing).
+#[derive(Debug)]
+pub struct CardLayout {
+    pub size: [f32; 2],
+    pub head: [f32; 4],
+    /// The experience level under the head, its one-pixel outline included; none at level 0.
+    pub level: Option<[f32; 4]>,
+    pub name: [f32; 4],
+    /// Where they are: the arrow and the distance, or the dimension's block.
+    pub place: [f32; 4],
+    /// The icon rows: armour (when worn), hearts, food.
+    pub rows: Vec<[f32; 4]>,
+}
+
+/// The one grid every card follows: a head column (the face, the level under it) and an info
+/// column (the name with the place at its end, then the icon rows), `SPACE` apart. `name_w`
+/// is already cut to what fits.
+pub fn card_layout(name_w: f32, level_w: Option<f32>, place_w: f32, rows: usize) -> CardLayout {
+    // The head column is as wide as the head, or as the level when a big level is wider.
+    let head_col = level_w.map_or(HEAD, |w| HEAD.max(w + 2.0));
+    let col = head_col + SPACE;
+    let head = [(head_col - HEAD) / 2.0, 0.0, HEAD, HEAD];
+    let level = level_w.map(|w| [(head_col - w - 2.0) / 2.0, HEAD + 1.0, w + 2.0, LINE + 1.0]);
+    let name = [col, 0.0, name_w.min(ROW_W - place_w - SPACE), LINE];
+    let place = [col + ROW_W - place_w, 0.0, place_w, LINE];
+    let rows: Vec<[f32; 4]> = (0..rows)
+        .map(|k| [col, LINE + SPACE + k as f32 * (ICON + 1.0), ROW_W, ICON + 1.0])
+        .collect();
+    let bottom = |r: &[f32; 4]| r[1] + r[3];
+    let height = rows
+        .iter()
+        .map(bottom)
+        .chain(level.iter().map(bottom))
+        .fold(bottom(&head), f32::max);
+    CardLayout { size: [col + ROW_W, height], head, level, name, place, rows }
+}
+
+/// The widest prefix of `text` that fits `width`, with an ellipsis when it was cut.
+fn fit(draw: &dyn DrawContext, text: &str, width: f32) -> String {
+    if draw.text_width(text) <= width {
+        return text.to_owned();
+    }
+    let mut cut: String = text.to_owned();
+    while !cut.is_empty() && draw.text_width(&format!("{cut}…")) > width {
+        cut.pop();
+    }
+    format!("{cut}…")
+}
+
+/// The game's tooltip panel around a content rectangle, as vanilla draws a tooltip.
+fn panel(draw: &mut dyn DrawContext, [x, y, w, h]: [f32; 4], tint: u32) {
+    let rect = [x - BLEED, y - BLEED, w + 2.0 * BLEED, h + 2.0 * BLEED];
+    blit(draw, BACKGROUND, rect, tint);
+    blit(draw, FRAME, rect, PANEL_TINT);
 }
 
 fn cards(host: &dyn ClientHost, draw: &mut dyn DrawContext, camera: &mod_api::Camera, mates: &[Mate], [w, _]: [f32; 2]) {
     let rtl = rtl::right_to_left(host);
     // The cards' side: the reading start, or its end; Arabic's start is the right.
     let at_right = (s::side(host) == Side::End) != rtl;
-    let x0 = if at_right { w - CARD_W - MARGIN } else { MARGIN };
-    // Inside a card, `flip` maps an LTR x to its mirrored place in a right-to-left language.
-    let flip = |x: f32, width: f32| if rtl { x0 + CARD_W - (x - x0) - width } else { x };
     let now = crate::now();
-    let mut y = MARGIN;
+    let mut top = MARGIN + VISIBLE;
     for mate in mates {
         let m = &mate.member;
-        let h = card_height(m);
+        let here = m.dimension == camera.dimension;
+        let at = [m.x, m.y, m.z];
+        let place_text = here.then(|| distance_text(host, distance(camera.position, at)));
+        let place_w = place_text.as_ref().map_or(ICON + 1.0, |t| ICON + 1.0 + draw.text_width(t));
+        let level_text = (m.level > 0).then(|| m.level.to_string());
+        let level_w = level_text.as_ref().map(|t| draw.text_width(t));
+        let rows = if m.armor > 0 { 3 } else { 2 };
+        let room = card_layout(f32::MAX, level_w, place_w, rows).name[2];
+        let name = fit(draw, &m.name, room);
+        let layout = card_layout(draw.text_width(&name), level_w, place_w, rows);
+        let [cw, ch] = layout.size;
+        let left = if at_right { w - MARGIN - VISIBLE - cw } else { MARGIN + VISIBLE };
+        // A part's screen rectangle, mirrored inside the card for a right-to-left language.
+        let put = |[x, y, pw, ph]: [f32; 4]| {
+            let x = if rtl { cw - x - pw } else { x };
+            [left + x, top + y, pw, ph]
+        };
+
         let hurt = mate.hurt_at.is_some_and(|t| now.saturating_sub(t) < FLASH);
-        blit(draw, PANEL, [x0, y, CARD_W, h], if hurt { HURT_TINT } else { PANEL_TINT });
+        panel(draw, [left, top, cw, ch], if hurt { HURT_TINT } else { PANEL_TINT });
 
-        // Face, with the experience level over its corner as the HUD draws it.
-        let head_x = flip(x0 + PAD, HEAD);
+        let [hx, hy, ..] = put(layout.head);
         if let Some(face) = head(host, &m.name) {
-            draw.item_stack(&face, [head_x, y + PAD], HEAD);
+            draw.item_stack(&face, [hx, hy], HEAD);
         }
-        if m.level > 0 {
-            let lv = m.level.to_string();
-            let lw = draw.text_width(&lv);
-            outlined(draw, &lv, [head_x + HEAD - lw + 1.0, y + PAD + HEAD - 6.0], LEVEL);
+        if let (Some(rect), Some(text)) = (layout.level, &level_text) {
+            let [lx, ly, ..] = put(rect);
+            outlined(draw, text, [lx + 1.0, ly + 1.0], LEVEL);
+        }
+        let [nx, ny, ..] = put(layout.name);
+        draw.text(&name, [nx, ny], TEXT, true);
+
+        // The place reads arrow then distance; the arrow points where they really are, so it
+        // never mirrors.
+        let [px, py, pw, _] = put(layout.place);
+        match &place_text {
+            Some(text) => {
+                let arrow_x = if rtl { px + pw - ICON / 2.0 } else { px + ICON / 2.0 };
+                let text_x = if rtl { px } else { px + ICON + 1.0 };
+                arrow(draw, [arrow_x, py + 4.0], bearing(camera.position, camera.yaw, at), 3.5, DIM);
+                draw.text(text, [text_x, py], DIM, true);
+            }
+            None => {
+                if let Some(icon) = dimension_icon(host, &m.dimension) {
+                    draw.item(icon, [px, py], ICON + 1.0);
+                }
+            }
         }
 
-        // Name, and where they are: an arrow and the distance, or their dimension's block.
-        let col = x0 + PAD + HEAD + 4.0;
-        let name_w = draw.text_width(&m.name);
-        draw.text(&m.name, [flip(col, name_w), y + PAD], TEXT, true);
-        if m.dimension == camera.dimension {
-            let at = [m.x, m.y, m.z];
-            let text = distance_text(host, distance(camera.position, at));
-            let tw = draw.text_width(&text);
-            let end = x0 + CARD_W - PAD;
-            draw.text(&text, [flip(end - tw, tw), y + PAD], DIM, true);
-            // The arrow points where they really are, so it never mirrors.
-            let angle = bearing(camera.position, camera.yaw, at);
-            arrow(draw, [flip(end - tw - 6.0, 0.0), y + PAD + 4.0], angle, 3.5, DIM);
-        } else if let Some(icon) = dimension_icon(host, &m.dimension) {
-            draw.item(icon, [flip(x0 + CARD_W - PAD - 10.0, 10.0), y + PAD - 1.0], 10.0);
-        }
-
-        // Armour (when worn), hearts and food: the HUD's own icons, ten to a row.
-        let mut row_y = y + PAD + 11.0;
-        let icon_x = |i: usize| flip(col + i as f32 * ICON, ICON + 1.0);
-        if m.armor > 0 {
-            icon_row(draw, ["hud/armor_full", "hud/armor_half", "hud/armor_empty"], m.armor, icon_x, row_y);
-            row_y += ICON + 1.0;
-        }
         let hp = (m.health / m.max_health.max(1.0) * 20.0).round() as i32;
-        let container = if hurt { "hud/heart/container_blinking" } else { "hud/heart/container" };
-        icon_row(draw, ["hud/heart/full", "hud/heart/half", container], hp, icon_x, row_y);
-        row_y += ICON + 1.0;
-        icon_row(draw, ["hud/food_full", "hud/food_half", "hud/food_empty"], m.food, icon_x, row_y);
+        let heart = if hurt { "hud/heart/container_blinking" } else { "hud/heart/container" };
+        let mut families = Vec::new();
+        if m.armor > 0 {
+            families.push((["hud/armor_full", "hud/armor_half", "hud/armor_empty"], m.armor));
+        }
+        families.push((["hud/heart/full", "hud/heart/half", heart], hp));
+        families.push((["hud/food_full", "hud/food_half", "hud/food_empty"], m.food));
+        for (rect, (sprites, value)) in layout.rows.iter().zip(families) {
+            let [rx, ry, ..] = put(*rect);
+            // Icon i from the row's reading start, so a mirrored row fills from the right.
+            let x = |i: usize| if rtl { rx + ROW_W - (i + 1) as f32 * ICON - 1.0 } else { rx + i as f32 * ICON };
+            icon_row(draw, sprites, value, x, ry);
+        }
 
-        y += h + GAP;
+        top += ch + 2.0 * VISIBLE + MARGIN;
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn inside(part: [f32; 4], [w, h]: [f32; 2]) -> bool {
+        part[0] >= 0.0 && part[1] >= 0.0 && part[0] + part[2] <= w + 1e-3 && part[1] + part[3] <= h + 1e-3
+    }
+
+    fn overlap(a: [f32; 4], b: [f32; 4]) -> bool {
+        a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3]
+    }
+
+    #[test]
+    fn every_card_part_is_inside_and_apart() {
+        // Short, long and empty names; no level, a small and a huge one; distance or block;
+        // with and without armour.
+        for name_w in [0.0, 30.0, 500.0] {
+            for level_w in [None, Some(6.0), Some(30.0)] {
+                for place_w in [ICON + 1.0, ICON + 1.0 + 40.0] {
+                    for rows in [2, 3] {
+                        let l = card_layout(name_w, level_w, place_w, rows);
+                        let mut parts = vec![l.head, l.name, l.place];
+                        parts.extend(l.level);
+                        parts.extend(l.rows.iter().copied());
+                        for (i, a) in parts.iter().enumerate() {
+                            assert!(inside(*a, l.size), "{a:?} leaves the card {:?} in {l:?}", l.size);
+                            for b in &parts[i + 1..] {
+                                assert!(!overlap(*a, *b), "{a:?} overlaps {b:?} in {l:?}");
+                            }
+                        }
+                        // The info column's parts all start on the same line.
+                        assert!(l.rows.iter().all(|r| r[0] == l.name[0]));
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn colours_are_stable_and_opaque() {

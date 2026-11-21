@@ -1,6 +1,6 @@
 id = "team"
 name = "Team"
-version = "0.1.0"
+version = "0.1.1"
 description = "Play together without typing: ping a spot for your friends, and see their health, food and where they are."
 authors = ["ameliiom"]
 license = "MIT"
@@ -11,5 +11,5 @@ side = "both"
 capabilities = ["registries"]
 
 [wasm]
-sha512 = "e9b1da2bda3fc19e75c0e8c1052513e082b516074e26d6e37cf564c40d67d67b55fb10b4daaff6e6a0814f367062b369f0b3e5eb1f5477ae5437db871656b37e"
+sha512 = "0a63d02ea37814b222d533ab8aceb4ef27fcc7eae1b05d38db4c9cdbafd6ec36c859023120e8b7b9597426c4f914f367a9d2c60e0e87f2eeaa35e1b8164f0c28"
 toolchain = "1.99.1 58cf8f9c35b355199727627d07ae34a4e2846d67"
