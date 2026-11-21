@@ -1,6 +1,6 @@
 [package]
 name = "mod-team"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 
 [dependencies]
@@ -9,6 +9,4 @@ edition = "2024"
 # pinned with `horizon-launcher native-lock .` before building.
 horizon-mod-api = { path = ".horizon/sdk/api/crates/horizon-mod-api" }
 
-# The SDK build this mod is made for: `cargo horizon-mod update` moves it.
-[package.metadata.horizon]
-sdk = "f037744a79f9982c47876f49c5a3067279f88706"
+

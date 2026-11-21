@@ -1,15 +1,16 @@
 id = "team"
 name = "Team"
-version = "0.1.1"
+version = "0.2.0"
 description = "Play together without typing: ping a spot for your friends, and see their health, food and where they are."
 authors = ["ameliiom"]
 license = "MIT"
-# A wasm mod: Rust in src/, built to mod.wasm by `cargo horizon-mod build --wasm` against the SDK build Cargo.toml pins, beside data/ and assets/.
+# A native mod: Rust in src/, compiled by the launcher against the game build [native] pins.
 api = "0.2"
 side = "both"
 # registries: "May add blocks, items, mob effects and entity types to your worlds".
 capabilities = ["registries"]
 
-[wasm]
-sha512 = "0a63d02ea37814b222d533ab8aceb4ef27fcc7eae1b05d38db4c9cdbafd6ec36c859023120e8b7b9597426c4f914f367a9d2c60e0e87f2eeaa35e1b8164f0c28"
-toolchain = "1.99.1 58cf8f9c35b355199727627d07ae34a4e2846d67"
+[native]
+game = "26.3"
+horizon = "f037744a79f9982c47876f49c5a3067279f88706"
+mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"
