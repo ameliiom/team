@@ -1,0 +1,15 @@
+{
+  "key.team.ping": "Ping",
+  "team.distance": "%sm",
+  "team.dimension.minecraft.overworld": "Overworld",
+  "team.dimension.minecraft.the_nether": "Nether",
+  "team.dimension.minecraft.the_end": "End",
+  "team.config.show_pings": "Pings",
+  "team.config.show_cards": "Team cards",
+  "team.config.show_arrows": "Edge arrows",
+  "team.config.ping_sound": "Ping sound",
+  "team.config.cards_side": "Cards",
+  "team.config.cards_side.start": "Reading start",
+  "team.config.cards_side.end": "Reading end",
+  "team.config.marker_size": "Marker size"
+}

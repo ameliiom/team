@@ -1,0 +1,15 @@
+{
+  "key.team.ping": "إشارة",
+  "team.distance": "%s م",
+  "team.dimension.minecraft.overworld": "العالم",
+  "team.dimension.minecraft.the_nether": "النذر",
+  "team.dimension.minecraft.the_end": "النهاية",
+  "team.config.show_pings": "الإشارات",
+  "team.config.show_cards": "كروت الفريق",
+  "team.config.show_arrows": "أسهم الحافة",
+  "team.config.ping_sound": "صوت الإشارة",
+  "team.config.cards_side": "الكروت",
+  "team.config.cards_side.start": "بداية القراءة",
+  "team.config.cards_side.end": "نهاية القراءة",
+  "team.config.marker_size": "حجم العلامة"
+}
