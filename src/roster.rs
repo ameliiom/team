@@ -90,7 +90,8 @@ pub fn receive(roster: Roster, _cx: &mut dyn IPayloadContext) -> Result<(), Stri
 
 /// Test builds only (`TEAM_DEMO` set at build time): two made-up mates around the camera, one
 /// circling near and getting hurt every few seconds, one in the Nether, so the cards, arrows and
-/// flash can be checked with one player. A normal build compiles this to nothing.
+/// flash can be checked with one player. A normal build compiles this to nothing. The launcher
+/// reuses a mod whose source did not change, so switching TEAM_DEMO needs a source change too.
 pub fn demo(host: &dyn mod_api::ClientHost) {
     if option_env!("TEAM_DEMO").is_none() {
         return;
