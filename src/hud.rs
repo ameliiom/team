@@ -79,12 +79,29 @@ pub fn bearing(eye: [f64; 3], yaw: f32, at: [f64; 3]) -> f32 {
     side.atan2(ahead) as f32
 }
 
-/// The point on the screen's inset edge in direction `angle` from the centre (0 = up).
+/// The top corners' room, in GUI pixels, that edge arrows keep clear: where minimaps sit (Map's
+/// is 143 square with its frame, plus its coordinates and margin).
+const CORNER: [f32; 2] = [156.0, 172.0];
+
+/// The point on the screen's inset edge in direction `angle` from the centre (0 = up), slid
+/// along its edge out of a top corner.
 pub fn edge_point(angle: f32, [w, h]: [f32; 2]) -> [f32; 2] {
     let (dx, dy) = (angle.sin(), -angle.cos());
     let (hw, hh) = (w / 2.0 - EDGE, h / 2.0 - EDGE);
     let scale = (hw / dx.abs().max(1e-6)).min(hh / dy.abs().max(1e-6));
-    [w / 2.0 + dx * scale, h / 2.0 + dy * scale]
+    let [x, y] = [w / 2.0 + dx * scale, h / 2.0 + dy * scale];
+    let in_corner = y < CORNER[1] && (x < CORNER[0] || x > w - CORNER[0]);
+    if !in_corner || CORNER[1] * 2.0 > h || CORNER[0] * 2.0 > w {
+        return [x, y];
+    }
+    let on_side = x <= EDGE + 0.5 || x >= w - EDGE - 0.5;
+    if on_side {
+        [x, CORNER[1]]
+    } else if x < CORNER[0] {
+        [CORNER[0], y]
+    } else {
+        [w - CORNER[0], y]
+    }
 }
 
 /// Projects a world point through this frame's camera.
@@ -447,6 +464,17 @@ mod tests {
         assert!(bearing([0.0; 3], 0.0, [-10.0, 0.0, 10.0]) > 0.0);
         assert!(bearing([0.0; 3], 0.0, [10.0, 0.0, 10.0]) < 0.0);
         assert!((bearing([0.0; 3], 0.0, [0.0, 0.0, -10.0]).abs() - std::f32::consts::PI).abs() < 1e-5);
+    }
+
+    #[test]
+    fn edge_arrows_keep_out_of_the_top_corners() {
+        let screen = [800.0, 450.0];
+        for step in 0..72 {
+            let angle = step as f32 * std::f32::consts::TAU / 72.0;
+            let [x, y] = edge_point(angle, screen);
+            assert!(!(y < CORNER[1] && (x < CORNER[0] || x > screen[0] - CORNER[0])), "{angle}: {x},{y}");
+            assert!((EDGE - 1e-3..=screen[0] - EDGE + 1e-3).contains(&x) && (EDGE - 1e-3..=screen[1] - EDGE + 1e-3).contains(&y));
+        }
     }
 
     #[test]
