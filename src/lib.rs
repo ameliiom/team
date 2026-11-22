@@ -61,7 +61,9 @@ pub struct Mod;
 impl Hooks for Mod {
     /// The ping key, the settings, and the three payloads (ping up, marker and roster down).
     fn register(&self, r: &mut dyn Registrar, _cx: &RegistrationContext) {
-        let mut key = KeyRegistration::new(PING_KEY, "key.keyboard.g");
+        // V: free in vanilla, Horizon and Map, and under the left hand while moving (G is
+        // vanilla's quick actions).
+        let mut key = KeyRegistration::new(PING_KEY, "key.keyboard.v");
         key.label = "key.team.ping".into();
         r.register_key_mapping(key);
         for spec in settings::specs() {
