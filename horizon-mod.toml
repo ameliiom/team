@@ -1,6 +1,6 @@
 id = "team"
 name = "Team"
-version = "0.3.0"
+version = "0.3.1"
 description = "Play together without typing: ping a spot for your friends, and see their health, food and where they are."
 authors = ["ameliiom"]
 license = "MIT"
