@@ -95,10 +95,15 @@ pub fn demo(host: &dyn mod_api::ClientHost) {
     if option_env!("TEAM_DEMO").is_none() {
         return;
     }
-    let Some(camera) = host.camera() else { return };
+    // Where the camera last was: a full-screen map draws no world and has no camera.
+    static LAST: Mutex<Option<([f64; 3], String)>> = Mutex::new(None);
+    if let Some(camera) = host.camera() {
+        *lock(&LAST) = Some((camera.position, camera.dimension.clone()));
+    }
+    let Some((position, dimension)) = lock(&LAST).clone() else { return };
     let now = crate::now();
     let turn = now as f64 / 40.0;
-    let [x, y, z] = camera.position;
+    let [x, y, z] = position;
     let near = Member {
         name: "Friend".into(),
         health: 20.0 - ((now / 60) % 4) as f32 * 4.0,
@@ -109,7 +114,7 @@ pub fn demo(host: &dyn mod_api::ClientHost) {
         x: x + 30.0 * turn.cos(),
         y,
         z: z + 30.0 * turn.sin(),
-        dimension: camera.dimension.clone(),
+        dimension,
     };
     let far = Member {
         name: "Explorer".into(),
