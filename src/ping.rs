@@ -17,6 +17,13 @@ const SAME_SPOT: f64 = 1.5;
 /// How far from the ray an entity may be and still be the one pinged, in blocks.
 const ENTITY_SLACK: f64 = 1.0;
 
+/// The slack for the entity ray: none when the player aimed at a block and the client saw
+/// loot there, so a mob standing beside the ore does not take the ping; else `ENTITY_SLACK`,
+/// so a far mob is easy to hit.
+pub fn entity_slack(ping: &PingSend) -> f64 {
+    if ping.loot { 0.0 } else { ENTITY_SLACK }
+}
+
 /// A marker on this client and the tick it arrived.
 pub struct Shown {
     pub marker: Marker,
@@ -97,7 +104,7 @@ pub fn relay(ping: PingSend, cx: &mut dyn IPayloadContext) -> Result<(), String>
         // `ENTITY_SLACK` so a far mob is easy to hit; the nearest one wins.
         let hit = player
             .level(read)
-            .and_then(|level| level.ray_trace_entities(read, origin, to, ENTITY_SLACK, Some(player.entity())))
+            .and_then(|level| level.ray_trace_entities(read, origin, to, entity_slack(&ping), Some(player.entity())))
             .and_then(|hits| hits.into_iter().min_by(|a, b| a.distance.total_cmp(&b.distance)));
         match hit {
             Some(hit) => {
@@ -185,6 +192,13 @@ mod tests {
             block: None,
             dimension: "minecraft:overworld".into(),
         }
+    }
+
+    #[test]
+    fn a_loot_ping_takes_the_block_not_a_mob_beside_it() {
+        let ping = |loot| PingSend { ox: 0.0, oy: 0.0, oz: 0.0, x: 1.0, y: 0.0, z: 0.0, block: Some("minecraft:diamond_ore".into()), loot };
+        assert_eq!(entity_slack(&ping(true)), 0.0);
+        assert_eq!(entity_slack(&ping(false)), ENTITY_SLACK);
     }
 
     #[test]
