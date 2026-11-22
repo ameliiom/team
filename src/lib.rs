@@ -8,12 +8,27 @@
 //!
 //! Everyone on the server is on the team. The server relays pings and sends each client the
 //! roster a few times a second (`payloads.rs`); drawing is client-side (`hud.rs`).
+//!
+//! Other mods on the client (Map) read the team through `with_mates`, `with_markers` and
+//! `colour`: the same state and colours this mod draws, never a copy.
 mod hud;
-mod payloads;
-mod ping;
-mod roster;
+pub mod payloads;
+pub mod ping;
+pub mod roster;
 mod rtl;
 mod settings;
+
+pub use hud::colour;
+
+/// The teammates this client knows, read under their lock.
+pub fn with_mates<R>(read: impl FnOnce(&[roster::Mate]) -> R) -> R {
+    read(&lock(&roster::MATES))
+}
+
+/// The live pings this client shows, read under their lock.
+pub fn with_markers<R>(read: impl FnOnce(&[ping::Shown]) -> R) -> R {
+    read(&lock(&ping::MARKERS))
+}
 
 use mod_api::{
     ClientHost, ClientTickPreEvent, GuiLayer, GuiLayerDrawEvent, GuiLayerPlacement, Hooks,
