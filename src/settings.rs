@@ -26,7 +26,8 @@ pub fn specs() -> Vec<SettingSpec> {
         SIDE,
         "team.config.cards_side",
         ["start", "end"].map(|s| format!("team.config.cards_side.{s}")),
-        0,
+        // The reading end by default: the start corner is the minimap's (Map, Xaero).
+        1,
     ));
     specs.push(SettingSpec::range(MARKER_SIZE, "team.config.marker_size", 0.5, 2.0, 0.1, 1.0));
     specs
@@ -39,8 +40,8 @@ pub fn on(host: &dyn ClientHost, key: &str) -> bool {
 
 pub fn side(host: &dyn ClientHost) -> Side {
     match host.setting_choice(SIDE) {
-        Some(1) => Side::End,
-        _ => Side::Start,
+        Some(0) => Side::Start,
+        _ => Side::End,
     }
 }
 
