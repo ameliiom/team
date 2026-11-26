@@ -11,5 +11,6 @@
   "team.config.cards_side": "الكروت",
   "team.config.cards_side.start": "بداية القراءة",
   "team.config.cards_side.end": "نهاية القراءة",
-  "team.config.marker_size": "حجم العلامة"
+  "team.config.marker_size": "حجم العلامة",
+  "team.config.hurt_alert": "تنبيه إذا ربعك في خطر"
 }

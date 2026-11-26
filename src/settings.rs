@@ -5,7 +5,9 @@ pub const PINGS: &str = "show_pings";
 pub const CARDS: &str = "show_cards";
 pub const ARROWS: &str = "show_arrows";
 pub const SOUND: &str = "ping_sound";
-const TOGGLES: [&str; 4] = [PINGS, CARDS, ARROWS, SOUND];
+/// A sound and a red edge arrow when a teammate is in trouble.
+pub const ALERT: &str = "hurt_alert";
+const TOGGLES: [&str; 5] = [PINGS, CARDS, ARROWS, SOUND, ALERT];
 const SIDE: &str = "cards_side";
 const MARKER_SIZE: &str = "marker_size";
 

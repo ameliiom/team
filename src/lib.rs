@@ -92,6 +92,7 @@ impl Hooks for Mod {
             ping::cast(host);
         }
         ping::expire(host);
+        roster::alarm(host);
         roster::demo(host);
     }
 

@@ -4,7 +4,7 @@
 //! mirror the cards (`rtl.rs`).
 use crate::payloads::PingKind;
 use crate::ping::{distance, view_vector, MARKERS};
-use crate::roster::{Mate, FLASH, MATES};
+use crate::roster::{Mate, ALERT_SHOW, FLASH, MATES};
 use crate::settings::{self as s, Side};
 use crate::{lock, rtl};
 use mod_api::client::hud_layout::Blend;
@@ -227,11 +227,16 @@ pub fn draw(host: &dyn ClientHost, draw: &mut dyn DrawContext) {
         markers(host, draw, &camera, screen);
     }
     let mates = lock(&MATES);
-    if s::on(host, s::ARROWS) {
-        for mate in mates.iter().filter(|m| m.member.dimension == camera.dimension) {
+    let now = crate::now();
+    let alerts = s::on(host, s::ALERT);
+    for mate in mates.iter().filter(|m| m.member.dimension == camera.dimension) {
+        // In trouble: a bigger red arrow for 3 s, even with the arrows off.
+        let alert = alerts && mate.alert_at.is_some_and(|t| now.saturating_sub(t) < ALERT_SHOW);
+        if s::on(host, s::ARROWS) || alert {
             let at = [mate.member.x, mate.member.y + 2.2, mate.member.z];
             if let Some(OnScreen::Edge { x, y, angle }) = place(host, at, screen) {
-                arrow(draw, [x, y], angle, 6.0, colour(&mate.member.name));
+                let (size, tint) = if alert { (9.0, DANGER) } else { (6.0, colour(&mate.member.name)) };
+                arrow(draw, [x, y], angle, size, tint);
                 if let Some(face) = head(host, &mate.member.name) {
                     draw.item_stack(&face, [x - 6.0, y + 7.0], 12.0);
                 }

@@ -11,5 +11,6 @@
   "team.config.cards_side": "Cards",
   "team.config.cards_side.start": "Reading start",
   "team.config.cards_side.end": "Reading end",
-  "team.config.marker_size": "Marker size"
+  "team.config.marker_size": "Marker size",
+  "team.config.hurt_alert": "Alert when a teammate is in trouble"
 }

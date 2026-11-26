@@ -1,22 +1,43 @@
 //! The roster: the server sends each player the others' state; the client keeps it and notices
-//! who just got hurt (health lower than last time) for the red flash.
+//! who just got hurt (health lower than last time) for the red flash, and who is in trouble
+//! (4 or more health lost within 2 s, or dropping below 6) for the alert: a red edge arrow and a
+//! sound.
 use crate::lock;
 use crate::payloads::{Member, Roster, ROSTER};
 use mod_api::{Host, IPayloadContext, PlayerRef, ServerHost, ServerTickEvent, ServerTickPhase};
 #[allow(unused_imports)]
 use mod_api::prelude::*;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Mutex;
 
 /// How often the server sends the roster, in server ticks (4 times a second).
 pub const EVERY: u32 = 5;
 /// How long a hurt card flashes, in client ticks.
 pub const FLASH: u32 = 10;
+/// The alert: health lost within this many client ticks (2 s) adds up...
+pub const ALERT_WINDOW: u32 = 40;
+/// ...to this much, or health falls below `ALERT_LOW`.
+pub const ALERT_LOSS: f32 = 4.0;
+pub const ALERT_LOW: f32 = 6.0;
+/// How long the alert's red arrow shows, in client ticks (3 s).
+pub const ALERT_SHOW: u32 = 60;
 
 /// A teammate on this client, with the client tick their health last dropped.
 pub struct Mate {
     pub member: Member,
     pub hurt_at: Option<u32>,
+    /// Health lost lately: (client tick, amount), within `ALERT_WINDOW`.
+    pub lost: Vec<(u32, f32)>,
+    /// When the alert last went off.
+    pub alert_at: Option<u32>,
+}
+
+/// An alert went off since the last tick: play its sound once.
+static ALARM: AtomicBool = AtomicBool::new(false);
+
+/// Whether a mate is in trouble: `lost` health within the window, from `before` to `now`.
+pub fn alarming(lost: f32, before: f32, now: f32) -> bool {
+    lost >= ALERT_LOSS || (now < ALERT_LOW && before >= ALERT_LOW)
 }
 
 pub static MATES: Mutex<Vec<Mate>> = Mutex::new(Vec::new());
@@ -75,9 +96,31 @@ pub fn merge(old: &[Mate], new: Vec<Member>, now: u32) -> Vec<Mate> {
             let before = old.iter().find(|m| m.member.name == member.name);
             let dropped = before.is_some_and(|b| member.health < b.member.health);
             let hurt_at = if dropped { Some(now) } else { before.and_then(|b| b.hurt_at) };
-            Mate { member, hurt_at }
+            let mut lost: Vec<(u32, f32)> = before.map(|b| b.lost.clone()).unwrap_or_default();
+            lost.retain(|(at, _)| now.saturating_sub(*at) < ALERT_WINDOW);
+            if let Some(b) = before.filter(|_| dropped) {
+                lost.push((now, b.member.health - member.health));
+            }
+            let mut alert_at = before.and_then(|b| b.alert_at);
+            if let Some(b) = before.filter(|_| dropped)
+                && alarming(lost.iter().map(|(_, h)| h).sum(), b.member.health, member.health)
+                && alert_at.is_none_or(|t| now.saturating_sub(t) >= ALERT_SHOW)
+            {
+                alert_at = Some(now);
+                ALARM.store(true, Ordering::Relaxed);
+            }
+            Mate { member, hurt_at, lost, alert_at }
         })
         .collect()
+}
+
+/// Client, each tick: the alert's sound, once for each alert.
+pub fn alarm(host: &dyn mod_api::ClientHost) {
+    if ALARM.swap(false, Ordering::Relaxed) && crate::settings::on(host, crate::settings::ALERT) {
+        let mut sound = mod_api::SoundPlay::ui("minecraft:entity.player.hurt");
+        sound.volume = 0.8;
+        let _ = host.play_local_sound(&sound, 0);
+    }
 }
 
 /// Client: replaces the mates.
@@ -163,5 +206,40 @@ mod tests {
         let third = merge(&second, vec![m("a", 16.0)], 9);
         assert_eq!(third.len(), 1);
         assert_eq!(third[0].hurt_at, Some(7));
+    }
+
+    #[test]
+    fn four_health_lost_within_two_seconds_alerts() {
+        let a = merge(&[], vec![m("a", 20.0)], 1);
+        let b = merge(&a, vec![m("a", 18.0)], 5);
+        assert_eq!(b[0].alert_at, None);
+        let c = merge(&b, vec![m("a", 16.0)], 20);
+        assert_eq!(c[0].alert_at, Some(20));
+    }
+
+    #[test]
+    fn slow_losses_do_not_alert() {
+        let a = merge(&[], vec![m("a", 20.0)], 1);
+        let b = merge(&a, vec![m("a", 18.0)], 5);
+        let c = merge(&b, vec![m("a", 16.0)], 50);
+        assert_eq!(c[0].alert_at, None);
+    }
+
+    #[test]
+    fn dropping_below_six_alerts() {
+        let a = merge(&[], vec![m("a", 7.0)], 1);
+        let b = merge(&a, vec![m("a", 5.0)], 5);
+        assert_eq!(b[0].alert_at, Some(5));
+        assert!(!alarming(1.0, 5.0, 4.0));
+    }
+
+    #[test]
+    fn an_alert_does_not_repeat_within_three_seconds() {
+        let a = merge(&[], vec![m("a", 20.0)], 1);
+        let b = merge(&a, vec![m("a", 15.0)], 5);
+        let c = merge(&b, vec![m("a", 10.0)], 30);
+        assert_eq!(c[0].alert_at, Some(5));
+        let d = merge(&c, vec![m("a", 4.0)], 70);
+        assert_eq!(d[0].alert_at, Some(70));
     }
 }
