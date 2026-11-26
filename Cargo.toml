@@ -1,6 +1,6 @@
 [package]
 name = "mod-team"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2024"
 
 [dependencies]
@@ -10,3 +10,7 @@ edition = "2024"
 horizon-mod-api = { path = ".horizon/sdk/api/crates/horizon-mod-api" }
 
 
+
+[lints.rust]
+# `kit_local`: set for local builds by horizon-mods/.cargo/config.toml (Kit's source in place).
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kit_local)'] }

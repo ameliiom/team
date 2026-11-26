@@ -1,6 +1,6 @@
 id = "team"
 name = "Team"
-version = "0.3.2"
+version = "0.3.3"
 description = "Play together without typing: ping a spot for your friends, and see their health, food and where they are."
 authors = ["ameliiom"]
 license = "MIT"
@@ -14,3 +14,7 @@ capabilities = ["registries"]
 game = "26.3"
 horizon = "f037744a79f9982c47876f49c5a3067279f88706"
 mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"
+
+[dependencies]
+# The shared code (rtl, settings, …).
+kit = "^0.1"

@@ -1,14 +1,14 @@
 //! Drawing, all in one HUD layer, with the game's own pieces: the locator-bar dot for markers,
 //! the player-head item for a teammate's face, the HUD's heart, food and armour sprites, the
 //! experience level's green number, and block icons for dimensions. Right-to-left languages
-//! mirror the cards (`rtl.rs`).
+//! mirror the cards (`kit::rtl`).
 use crate::payloads::PingKind;
 use crate::ping::{distance, view_vector, MARKERS};
 use crate::roster::{Mate, ALERT_SHOW, FLASH, MATES};
 use crate::settings::{self as s, Side};
-use crate::{lock, rtl};
+use crate::lock;
 use mod_api::client::hud_layout::Blend;
-use mod_api::{ClientHost, Compound, DrawContext, GuiDraw, Identifier, ItemKey, ItemStack, Tag};
+use mod_api::{ClientHost, Compound, DrawContext, GuiDraw, ItemKey, ItemStack, Tag};
 #[allow(unused_imports)]
 use mod_api::prelude::*;
 
@@ -164,9 +164,7 @@ fn centred_text(draw: &mut dyn DrawContext, text: &str, [x, y]: [f32; 2], argb: 
     draw.text(text, [left.round(), y.round()], argb, true);
 }
 
-fn item_key(host: &dyn ClientHost, id: &str) -> Option<ItemKey> {
-    host.item_key(&Identifier::parse(id).ok()?)
-}
+use crate::kit::lang::item_key;
 
 /// A dimension's icon: the block it is made of (the Nether's netherrack, the End's end stone),
 /// else grass for the Overworld and any other dimension.
@@ -342,7 +340,7 @@ fn panel(draw: &mut dyn DrawContext, [x, y, w, h]: [f32; 4], tint: u32) {
 }
 
 fn cards(host: &dyn ClientHost, draw: &mut dyn DrawContext, camera: &mod_api::Camera, mates: &[Mate], [w, _]: [f32; 2]) {
-    let rtl = rtl::right_to_left(host);
+    let rtl = crate::kit::rtl::right_to_left(host);
     // The cards' side: the reading start, or its end; Arabic's start is the right.
     let at_right = (s::side(host) == Side::End) != rtl;
     let now = crate::now();

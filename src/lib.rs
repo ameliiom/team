@@ -11,11 +11,19 @@
 //!
 //! Other mods on the client (Map) read the team through `with_mates`, `with_markers` and
 //! `colour`: the same state and colours this mod draws, never a copy.
+// Kit (ameliiom/kit), the shared code: the installed Kit mod, or its source in place for
+// local builds (`kit_local`, horizon-mods/.cargo/config.toml).
+#[cfg(kit_local)]
+#[allow(dead_code)]
+#[path = "../../kit/src/lib.rs"]
+mod kit;
+#[cfg(not(kit_local))]
+use ::kit;
 mod hud;
 pub mod payloads;
 pub mod ping;
 pub mod roster;
-mod rtl;
+
 mod settings;
 
 pub use hud::colour;
@@ -38,7 +46,6 @@ use mod_api::{
 #[allow(unused_imports)]
 use mod_api::prelude::*;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Mutex;
 
 pub(crate) const MOD_ID: &str = "team";
 /// Client ticks, the clock markers and flashes are timed by.
@@ -50,9 +57,7 @@ pub(crate) fn now() -> u32 {
 const LAYER: &str = "team:hud";
 const PING_KEY: &str = "ping";
 
-pub(crate) fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
-}
+pub(crate) use kit::sync::lock;
 
 #[derive(Default)]
 pub struct Mod;

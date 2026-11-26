@@ -41,9 +41,7 @@ pub fn view_vector(yaw: f32, pitch: f32) -> [f64; 3] {
     [-yaw.sin() * pitch.cos(), -pitch.sin(), yaw.cos() * pitch.cos()]
 }
 
-pub fn distance(a: [f64; 3], b: [f64; 3]) -> f64 {
-    (0..3).map(|i| (a[i] - b[i]).powi(2)).sum::<f64>().sqrt()
-}
+pub use crate::kit::near::distance;
 
 /// An ore or a block that keeps something: a block entity is the game's own sign of that.
 fn is_loot(host: &dyn ClientHost, block: mod_api::BlockKey, id: &str) -> bool {
@@ -209,11 +207,6 @@ mod tests {
         assert!((down[1] + 1.0).abs() < 1e-9);
         let west = view_vector(90.0, 0.0);
         assert!((west[0] + 1.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn distance_is_euclidean() {
-        assert_eq!(distance([0.0; 3], [3.0, 4.0, 0.0]), 5.0);
     }
 
     #[test]
